@@ -12,6 +12,7 @@ const integer = (x: unknown) =>
   Number.isSafeInteger(x) &&
   Number(x) >= 0 &&
   Number(x) <= Number.MAX_SAFE_INTEGER;
+const timestamp = (x: unknown) => integer(x) && Number(x) <= 8640000000000000;
 export function validateState(value: unknown): State {
   const s = record(value);
   if (s.corrections === undefined) s.corrections = [];
@@ -50,7 +51,8 @@ export function validateState(value: unknown): State {
       typeof p.name !== "string" ||
       !p.name.trim() ||
       p.name.length > 120 ||
-      ![p.price, p.quantity, p.threshold, p.updatedAt].every(integer) ||
+      ![p.price, p.quantity, p.threshold].every(integer) ||
+      !timestamp(p.updatedAt) ||
       p.quantity > 1e9 ||
       p.price > 1e9 ||
       p.threshold > 1e9 ||
@@ -72,7 +74,7 @@ export function validateState(value: unknown): State {
     if (transactionIds.has(sale.id)) fail("Duplicate transaction identity.");
     transactionIds.add(sale.id);
     if (
-      !integer(sale.at) ||
+      !timestamp(sale.at) ||
       !integer(sale.total) ||
       sale.total <= 0 ||
       !["Cash", "MTN Mobile Money", "Airtel Money", "Credit"].includes(
@@ -83,7 +85,10 @@ export function validateState(value: unknown): State {
       sale.items.length > 200
     )
       fail("Invalid sale in backup.");
-    if (sale.method === "Credit" && !customers.has(sale.customerId))
+    if (
+      (sale.method === "Credit" || sale.customerId !== undefined) &&
+      !customers.has(sale.customerId)
+    )
       fail("Missing credit customer.");
     const seen = new Set();
     let total = 0;
@@ -111,7 +116,7 @@ export function validateState(value: unknown): State {
     transactionIds.add(p.id);
     if (
       !customers.has(p.customerId) ||
-      !integer(p.at) ||
+      !timestamp(p.at) ||
       !integer(p.amount) ||
       p.amount <= 0 ||
       p.amount > 1e9 ||
@@ -138,7 +143,7 @@ export function validateState(value: unknown): State {
       Math.abs(x.delta) > 1e9 ||
       typeof x.reason !== "string" ||
       !x.reason.trim() ||
-      !integer(x.at) ||
+      !timestamp(x.at) ||
       (x.productId !== undefined && !products.has(x.productId))
     )
       fail("Invalid stock adjustment.");
@@ -149,7 +154,7 @@ export function validateState(value: unknown): State {
       !id(c.id) ||
       transactionIds.has(c.id) ||
       !sale ||
-      !integer(c.at) ||
+      !timestamp(c.at) ||
       typeof c.reason !== "string" ||
       !c.reason.trim() ||
       !["return", "reversal"].includes(c.kind) ||
@@ -201,7 +206,7 @@ export function validateState(value: unknown): State {
   for (const r of s.reviews)
     if (
       typeof r.message !== "string" ||
-      !integer(r.at) ||
+      !timestamp(r.at) ||
       (r.resolved !== undefined && typeof r.resolved !== "boolean") ||
       (r.operation && r.operation.id !== r.id)
     )
@@ -227,6 +232,7 @@ const canonical = (x: unknown): string => {
     return (
       "{" +
       Object.entries(x)
+        .filter(([, value]) => value !== undefined)
         .sort(([a], [b]) => a.localeCompare(b))
         .map(([k, v]) => JSON.stringify(k) + ":" + canonical(v))
         .join(",") +
@@ -282,11 +288,16 @@ export function parseBackup(text: string, accountId: string): Backup {
     (b.schemaVersion !== undefined && b.schemaVersion !== 1)
   )
     fail("Unsupported backup version.");
-  if (record(b.business).id !== accountId)
+  if (
+    typeof record(b.business).business !== "string" ||
+    !b.business.business.trim()
+  )
+    fail("Invalid business name in backup.");
+  if (b.business.id !== accountId)
     fail(
       "This backup belongs to another business. Sign in to the original business.",
     );
-  if (!integer(b.exportedAt) || !Array.isArray(b.operations))
+  if (!timestamp(b.exportedAt) || !Array.isArray(b.operations))
     fail("Invalid backup metadata.");
   b.state = validateState(b.state);
   for (const op of b.operations)

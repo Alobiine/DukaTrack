@@ -1,23 +1,14 @@
 import { AuditHistory } from "../components/AuditHistory";
 import {
-  Package,
-  Search,
-  Users,
-  ArrowDownLeft,
-  ChevronRight,
   Download,
-  ShoppingBag,
-  Receipt,
-  Store,
-  LogOut,
   Cloud,
   RefreshCw,
   AlertTriangle,
   ShieldCheck,
 } from "lucide-react";
-import { Stat, Empty } from "../components/primitives";
-import { money, stamp } from "../../lib/format";
-import { balance, type State, type Product, type Sale } from "../../lib/domain";
+import { Empty } from "../components/primitives";
+import { stamp } from "../../lib/format";
+import { type State } from "../../lib/domain";
 import type { Bundle } from "../../lib/sync";
 import type { Backup } from "../../lib/backup";
 import { RestoreBackup } from "../components/RestoreBackup";

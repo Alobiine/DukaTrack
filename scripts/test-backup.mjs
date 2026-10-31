@@ -19,7 +19,7 @@ const mod = async (suffix) =>
         r.outputFiles.find((x) => x.path.endsWith(suffix)).text,
       ).toString("base64")
   );
-const { empty, apply, balance } = await mod("domain.js"),
+const { empty, apply, balance, snapshotSale } = await mod("domain.js"),
   { parseBackup, mergeBackup } = await mod("backup.js");
 let state = empty();
 let n = 0;
@@ -132,4 +132,52 @@ assert.throws(() => apply(edited, stale), /changed on another device/);
 assert.equal(state.products[0].name, "Sugar");
 console.log(
   "PASS: same-timestamp product edits use operation revisions to reject stale writes.",
+);
+
+const cash = apply(
+  state,
+  op("sale", {
+    items: [{ productId: "sugar", quantity: 1, price: 5000 }],
+    method: "Cash",
+  }),
+);
+const cashRoundTrip = parseBackup(
+  JSON.stringify({ ...backup, state: cash }),
+  "a",
+);
+assert.equal(mergeBackup(cash, cashRoundTrip.state).sales.length, 2);
+console.log(
+  "PASS: JSON round-trip of optional cash-sale fields does not create false restore conflicts.",
+);
+
+const malformedBusiness = structuredClone(backup);
+malformedBusiness.business.business = { name: "Invalid" };
+assert.throws(
+  () => parseBackup(JSON.stringify(malformedBusiness), "a"),
+  /business name/,
+);
+const invalidTime = structuredClone(backup);
+invalidTime.state.sales[0].at = Number.MAX_SAFE_INTEGER;
+assert.throws(
+  () => parseBackup(JSON.stringify(invalidTime), "a"),
+  /Invalid sale/,
+);
+console.log(
+  "PASS: malformed preview metadata and out-of-range report dates are rejected.",
+);
+
+const captured = snapshotSale(state, {
+  items: [{ productId: "sugar", quantity: 1, price: 5000 }],
+  method: "Credit",
+  customerId: "c",
+});
+assert.equal(captured.items[0].name, "Sugar");
+assert.equal(captured.customerSnapshot.name, "Customer");
+assert.equal(captured.total, 5000);
+const renamed = structuredClone(state);
+renamed.products[0].name = "Renamed sugar";
+const historical = apply(renamed, op("sale", captured));
+assert.equal(historical.sales.at(-1).items[0].name, "Sugar");
+console.log(
+  "PASS: offline sale evidence preserves original product/customer details and receipt totals.",
 );

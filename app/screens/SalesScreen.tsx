@@ -1,22 +1,9 @@
-import {
-  ShoppingBag,
-  Wallet,
-  Smartphone,
-  Users,
-  Package,
-  ArrowUpRight,
-  ArrowDownLeft,
-  Cloud,
-  RefreshCw,
-  ChevronRight,
-  Search,
-} from "lucide-react";
-import { Stat, Empty } from "../components/primitives";
-import { Chart } from "../components/Chart";
+import { Search } from "lucide-react";
+
 import { SaleRows } from "../components/SaleRows";
-import { money, stamp, day, nowDay } from "../../lib/format";
-import { balance, type State, type Sale, type Product } from "../../lib/domain";
-import type { Bundle } from "../../lib/sync";
+import { money } from "../../lib/format";
+import { type State, type Sale } from "../../lib/domain";
+
 type Props = {
   filter: string;
   setFilter: (v: string) => void;

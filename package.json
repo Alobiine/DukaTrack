@@ -15,7 +15,8 @@
     "setup:local": "npm run build && npm run db:local",
     "db:local": "node scripts/db-local.mjs",
     "typecheck": "tsc --noEmit",
-    "test": "node scripts/test-business.mjs && node scripts/test-sync.mjs && node scripts/test-backup.mjs && node scripts/test-offline.mjs"
+    "test": "node scripts/test-business.mjs && node scripts/test-sync.mjs && node scripts/test-backup.mjs && node scripts/test-offline.mjs",
+    "test:runtime": "node scripts/test-runtime.mjs"
   },
   "dependencies": {
     "@base-ui/react": "^1.7.0",

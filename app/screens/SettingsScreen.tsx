@@ -1,25 +1,5 @@
-import {
-  Package,
-  Search,
-  Users,
-  ArrowDownLeft,
-  ChevronRight,
-  Download,
-  ShoppingBag,
-  Receipt,
-  Store,
-  LogOut,
-  Cloud,
-  RefreshCw,
-  AlertTriangle,
-  ShieldCheck,
-} from "lucide-react";
-import { Stat, Empty } from "../components/primitives";
-import { money, stamp } from "../../lib/format";
-import { balance, type State, type Product, type Sale } from "../../lib/domain";
-import type { Bundle } from "../../lib/sync";
-import type { Backup } from "../../lib/backup";
-import { RestoreBackup } from "../components/RestoreBackup";
+import { Download, Store, LogOut } from "lucide-react";
+
 type Props = {
   account: { business: string; owner: string; phone: string };
   install: { prompt: () => Promise<unknown> } | null;

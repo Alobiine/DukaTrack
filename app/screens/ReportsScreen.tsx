@@ -1,25 +1,8 @@
-import {
-  Package,
-  Search,
-  Users,
-  ArrowDownLeft,
-  ChevronRight,
-  Download,
-  ShoppingBag,
-  Receipt,
-  Store,
-  LogOut,
-  Cloud,
-  RefreshCw,
-  AlertTriangle,
-  ShieldCheck,
-} from "lucide-react";
-import { Stat, Empty } from "../components/primitives";
-import { money, stamp } from "../../lib/format";
+import { Package, Users, Download, ShoppingBag, Receipt } from "lucide-react";
+import { Stat } from "../components/primitives";
+import { money } from "../../lib/format";
 import { balance, type State, type Product, type Sale } from "../../lib/domain";
-import type { Bundle } from "../../lib/sync";
-import type { Backup } from "../../lib/backup";
-import { RestoreBackup } from "../components/RestoreBackup";
+
 type Props = {
   s: State;
   products: Product[];

@@ -99,6 +99,7 @@ export function apply(input: State, op: Operation): State {
     !label(op.id) ||
     !Number.isSafeInteger(op.at) ||
     op.at < 0 ||
+    op.at > 8640000000000000 ||
     !op.payload ||
     typeof op.payload !== "object"
   )
@@ -289,7 +290,7 @@ export function apply(input: State, op: Operation): State {
         x.revision = op.id;
         return {
           productId: x.id,
-          name: x.name,
+          name: label(i.name) ? i.name.trim() : x.name,
           quantity: i.quantity,
           price: x.price,
         };
@@ -298,7 +299,7 @@ export function apply(input: State, op: Operation): State {
         (a: number, x: any) => a + x.price * x.quantity,
         0,
       );
-      if (!positive(total))
+      if (!positive(total) || (p.total !== undefined && p.total !== total))
         throw Error("Sale total must be greater than zero.");
       s.sales.push({
         id: op.id,
@@ -373,4 +374,24 @@ export function applyCloud(
     });
     return s;
   }
+}
+
+export type SaleDraft = {
+  items: { productId: string; quantity: number; price: number }[];
+  method: string;
+  customerId?: string;
+};
+// Capture human-readable receipt evidence before any other device can rename a product/customer.
+export function snapshotSale(state: State, draft: SaleDraft) {
+  const customer = state.customers.find((c) => c.id === draft.customerId);
+  return {
+    ...draft,
+    items: draft.items.map((i) => ({
+      ...i,
+      name:
+        state.products.find((p) => p.id === i.productId)?.name || i.productId,
+    })),
+    total: draft.items.reduce((n, i) => n + i.price * i.quantity, 0),
+    customerSnapshot: customer ? { ...customer } : undefined,
+  };
 }

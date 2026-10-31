@@ -38,7 +38,7 @@ npm.cmd run dev
 
 Skip the copy only for a new installation without `.wrangler/state`. Keep the backup until you have checked every account. `db:local` applies pending additive migrations; it never resets your database. Do not edit applied SQL migrations.
 
-The generated `0001` migration adds related business, owner membership, product, customer, sale, historical sale-item, repayment, stock-movement, correction, operation, conflict and audit tables plus recovery tables. Each business migrates its existing snapshot transactionally on its first successful sync. The original `workspaces` row is retained unchanged. Subsequent sync reads related tables, not the old document. A failed validation or losing concurrent write leaves existing data intact. Legacy adjustments did not retain their target product ID; migration preserves those records without inventing a target.
+The generated `0001` migration adds related business, owner membership, product, customer, sale, historical sale-item, repayment, stock-movement, correction, operation, conflict and audit tables plus recovery tables. The `0002` migration adds account security-event history. Each business migrates its existing snapshot transactionally on its first successful sync. The original `workspaces` row is retained unchanged. Subsequent sync reads related tables, not the old document. A failed validation or losing concurrent write leaves existing data intact. Legacy adjustments did not retain their target product ID; migration preserves those records without inventing a target.
 
 `db/schema.ts` and Drizzle snapshots track the schema. For later schema changes use `npm.cmd run db:generate`, inspect the generated SQL, then `npm.cmd run db:local`. The account and business ID remains stable throughout migration.
 
@@ -49,9 +49,10 @@ npm.cmd run typecheck
 npm.cmd test
 node --check public/sw.js
 npm.cmd run build
+npm.cmd run test:runtime
 ```
 
-Tests use isolated in-memory SQLite and mocked storage/service-worker lifecycles; they do not touch your business database. They cover server validation, account isolation, retry identities, all pending batches, interrupted sync, failed local commits, retained conflicting sales, restore validation, duplicate prevention, additive migration, stale writers, transaction rollback, returns, credit refunds, recovery token use/expiry, password changes, sessions and audit access.
+`test:runtime` starts and stops a real Worker with a separate D1 store under `.sites-runtime/runtime-smoke`; it requires a completed build and a free localhost port. Other tests use isolated in-memory SQLite and mocked storage/service-worker lifecycles; they do not touch your business database. They cover server validation, account isolation, retry identities, all pending batches, interrupted sync, failed local commits, retained conflicting sales, restore validation, duplicate prevention, additive migration, stale writers, transaction rollback, returns, credit refunds, recovery token use/expiry, password changes, sessions and audit access.
 
 ## Offline and browser checks
 

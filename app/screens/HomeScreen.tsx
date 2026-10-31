@@ -9,7 +9,6 @@ import {
   Cloud,
   RefreshCw,
   ChevronRight,
-  Search,
 } from "lucide-react";
 import { Stat, Empty } from "../components/primitives";
 import { Chart } from "../components/Chart";

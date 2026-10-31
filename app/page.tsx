@@ -1,19 +1,21 @@
+"use client";
+
+import { snapshotSale } from "../lib/domain";
 import { salesCsv } from "../lib/export";
 import { SalesScreen } from "./screens/SalesScreen";
 import { HomeScreen } from "./screens/HomeScreen";
-import { Chart } from "./components/Chart";
-import { SaleRows } from "./components/SaleRows";
+
 import { money, day, nowDay, stamp } from "../lib/format";
 import { SyncScreen } from "./screens/SyncScreen";
 import { SettingsScreen } from "./screens/SettingsScreen";
 import { ReportsScreen } from "./screens/ReportsScreen";
 import { CreditScreen } from "./screens/CreditScreen";
 import { StockScreen } from "./screens/StockScreen";
-import { Brand, Field, Stat, Empty } from "./components/primitives";
+import { Brand, Field } from "./components/primitives";
 ("use client");
 import { useWorkspaceUpdates } from "./components/useWorkspaceUpdates";
 import { CorrectionForm } from "./components/CorrectionForm";
-import { RestoreBackup } from "./components/RestoreBackup";
+
 import { mergeBackup, sameRecords, type Backup } from "../lib/backup";
 import { AccountSecurity } from "./components/AccountSecurity";
 import { DeviceLock } from "./components/DeviceLock";
@@ -26,38 +28,21 @@ import {
   Users,
   BarChart3,
   Settings,
-  RefreshCw,
   Plus,
   ArrowUpRight,
   ArrowDownLeft,
   Search,
   ChevronRight,
-  Wifi,
   WifiOff,
   Download,
   LogOut,
   Check,
   AlertTriangle,
   X,
-  Store,
-  ArrowLeft,
   Cloud,
   ShieldCheck,
-  Receipt,
-  Menu,
-  Wallet,
-  Smartphone,
-  History,
-  MoreHorizontal,
 } from "lucide-react";
-import {
-  apply,
-  empty,
-  balance,
-  type State,
-  type Operation,
-  type Product,
-} from "../lib/domain";
+import { apply, balance, type State, type Operation } from "../lib/domain";
 import { readLocal, writeLocal, withWorkspaceLock } from "../lib/storage";
 const uid = () =>
   crypto.randomUUID?.() ||
@@ -240,7 +225,12 @@ export default function App() {
         const a = aRef.current;
         if (!a) throw Error("Sign in first.");
         const b: Bundle = (await readLocal(a.id)) || blank();
-        const op: Operation = { id: uid(), at: Date.now(), type, payload };
+        const op: Operation = {
+          id: uid(),
+          at: Date.now(),
+          type,
+          payload: type === "sale" ? snapshotSale(b.state, payload) : payload,
+        };
         const next = {
           ...b,
           state: apply(b.state, op),

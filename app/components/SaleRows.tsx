@@ -1,6 +1,6 @@
 import { Receipt, ChevronRight, ShoppingBag } from "lucide-react";
 import { Empty } from "./primitives";
-import { money, stamp, day } from "../../lib/format";
+import { money, stamp } from "../../lib/format";
 import type { Sale, Correction } from "../../lib/domain";
 export function SaleRows({
   rows,
