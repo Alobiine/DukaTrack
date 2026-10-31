@@ -1,0 +1,27 @@
+{
+  "version": "7",
+  "dialect": "sqlite",
+  "entries": [
+    {
+      "idx": 0,
+      "version": "6",
+      "when": 1793454215892,
+      "tag": "0000_optimal_proemial_gods",
+      "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "6",
+      "when": 1793461573832,
+      "tag": "0001_spooky_goliath",
+      "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "6",
+      "when": 1793463012264,
+      "tag": "0002_bouncy_roxanne_simpson",
+      "breakpoints": true
+    }
+  ]
+}

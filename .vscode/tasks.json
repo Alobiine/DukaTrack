@@ -1,0 +1,24 @@
+{
+  "version": "2.0.0",
+  "tasks": [
+    {
+      "label": "DukaTrack: Run",
+      "type": "npm",
+      "script": "dev",
+      "isBackground": true,
+      "problemMatcher": []
+    },
+    {
+      "label": "DukaTrack: Set up local database",
+      "type": "npm",
+      "script": "setup:local",
+      "problemMatcher": []
+    },
+    {
+      "label": "DukaTrack: Check types",
+      "type": "npm",
+      "script": "typecheck",
+      "problemMatcher": []
+    }
+  ]
+}
