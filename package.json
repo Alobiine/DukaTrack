@@ -14,6 +14,8 @@
     "db:generate": "drizzle-kit generate",
     "setup:local": "npm run build && npm run db:local",
     "db:local": "node scripts/db-local.mjs",
+    "cf": "node --import ./scripts/sites-env.mjs ./node_modules/wrangler/bin/wrangler.js",
+    "deploy:cloudflare": "node scripts/deploy-cloudflare.mjs",
     "typecheck": "tsc --noEmit",
     "test": "node scripts/test-business.mjs && node scripts/test-sync.mjs && node scripts/test-backup.mjs && node scripts/test-offline.mjs",
     "test:runtime": "node scripts/test-runtime.mjs"

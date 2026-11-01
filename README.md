@@ -4,6 +4,8 @@ An offline-first single-owner business workspace for Ugandan MSMEs. React/TypeSc
 
 Start with [START_HERE.md](START_HERE.md) for Windows setup, safe upgrades, additive migration, testing, backup restoration and recovery-service configuration. [UPGRADE_NOTES.md](UPGRADE_NOTES.md) records stage results and verification limits.
 
+For hosting in your own Cloudflare account, see [CLOUDFLARE.md](CLOUDFLARE.md).
+
 ## Implemented
 
 - Local transaction completion before success, visible storage failures, offline shell/assets, device privacy lock and safe cross-tab writes.
