@@ -1,6 +1,6 @@
 # DukaTrack requirements baseline and assessment
 
-Assessed on 2 November 2026 against the owner's MoSCoW priorities and this local checkout. This baseline describes the intended release; it does not claim that every requirement is complete. No deployment or live-account verification was performed.
+Assessed on 2 November 2026 against the owner's MoSCoW priorities. Updated through deployed release `7907397` and the owner's final Android/iPhone acceptance results. This document distinguishes implemented features, tested acceptance scenarios and remaining limitations; historical stage entries below are retained as a record.
 
 Status meanings: **Implemented** means a code path exists, with automated evidence where noted. **Partial** means a dependency or part of the requirement remains. **Needs verification** means real browser/device acceptance is outstanding. Implementation is not release acceptance.
 
@@ -17,8 +17,8 @@ Status meanings: **Implemented** means a code path exists, with automated eviden
 | Distinguish cash, MTN Mobile Money and Airtel Money | Implemented | Separate allowed methods for sales and repayments, displayed in reports. These are records only. |
 | Manage customers, credit sales and repayments | Implemented | Customer and repayment forms, credit screen and validated domain operations. No staff management requirement is implied. |
 | Calculate outstanding balances | Implemented | `balance` in `lib/domain.ts` accounts for credit sales, repayments and corrections; overpayments rejected. |
-| Save and retrieve records offline | Implemented; needs device verification | IndexedDB committed transactions, workspace locks and service-worker caching. Mock tests pass; offline refresh, closure/reopen, eviction and storage exhaustion need real browser checks. Initial registration/sign-in requires online access. |
-| Synchronise with the cloud | Implemented; needs deployed verification | `lib/sync.ts`, authenticated sync route and transactional relational persistence. Automated batch/retry tests pass; live multi-device acceptance and volume tests remain. Sync runs while the app is open. |
+| Save and retrieve records offline | Agreed acceptance passed | Desktop Chrome tests cover offline sale, reload, complete browser closure/reopen and reconnect. Owner confirmed installation/offline reopening with records intact on both Android and iPhone. Initial registration/sign-in requires online access; OS/browser eviction and real-device storage exhaustion remain outside these checks. |
+| Synchronise with the cloud | Agreed acceptance passed | Batch/retry and two-session Worker/D1 tests pass. Owner confirmed the same live test product, price and stock quantity match between both phones after sync. Sync runs while the app is open; load/scale testing is separate. |
 | Prevent duplicate transactions | Implemented | Stable operation IDs, applied-operation tracking and idempotent retry/import tests. |
 | Preserve conflicting records for owner review | Implemented | Full operation evidence retained in reviews; Sync screen supports inspection and reasoned resolution. Automated rejection/replay tests pass. Multi-device browser acceptance remains. |
 | Back up and restore business records | Implemented with limits | JSON export, validation/preview, same-business conservative merge, safety copy and queued restore. Backup tests pass. Imports limited to 400 KB; differing existing records block import; cloud sync still required. Browser download/import acceptance remains. |
@@ -35,7 +35,7 @@ Status meanings: **Implemented** means a code path exists, with automated eviden
 | Basic sales, stock and credit reports | Desktop Chrome acceptance passed | Browser checks cover revenue/average, cash/MTN/Airtel/credit breakdown, stock quantities/value, credit balances and actual CSV download with gross/returned/net/refund values. Stock and credit summaries are current/all-time, not historical snapshots. |
 | Clear sync status, pending count and last-sync time | Desktop Chrome acceptance passed | Offline state, disabled sync control, exact pending count, successful sync timestamp and failed-session warning tested. Fixed false Synced/up-to-date displays after a sync failure, including persistence across navigation. |
 | Password change and secure account recovery | Baseline browser/live checks passed | Browser verifies current-password checks, old-session revocation and new-password sign-in. Owner confirmed receipt of the live Brevo reset email, successful reset and sign-in. Device-lock browser checks cover wrong passphrases, offline unlock, lock on reload and same-account online recovery. Email ownership verification and linking emails to legacy accounts remain separate feature gaps; this is not an independent security audit. |
-| Installable PWA | Chrome criteria passed; physical-phone checks pending | Manifest parsing and Chrome installability pass. Explicit 192/512 PNG icons, Apple touch icon and Apple standalone metadata are present and cached. Android/iPhone installation and offline launch must still be confirmed on actual phones. |
+| Installable PWA | Agreed acceptance passed | Chrome manifest/installability checks pass. Explicit PNG/Apple icons and standalone metadata are present. Owner confirmed installation and offline reopening with records visible on both Android and iPhone. |
 | Simple receipt viewing and downloading | Desktop Chrome acceptance passed | Actual receipt viewer and downloaded text file verify business, item/quantity, UGX total and payment method. Phone file handling remains unverified; PDF and thermal printing are not implied. |
 
 ## Could have
@@ -68,23 +68,28 @@ Actual mobile-money payment processing, banking integration, payroll, tax filing
 | Consistent UGX amounts | Shared `money` formatter and integer business amounts exist. Review exports and rendered examples during acceptance. |
 | Reliable data handling | Automated validation, transaction, retry, duplicate, conflict and restore checks pass. Real browser lifecycle, deployed concurrency and large-volume tests remain. |
 
-## Remaining acceptance groups
+## Current acceptance result
 
-Batch two's automated checks have passed. The owner confirmed the complete live email-reset flow. **Two physical/live acceptance items remain**; automated mobile viewport checks do not replace these. Optional Could-have features and independent security/load certification are excluded from this count.
+**All agreed acceptance groups in the two-batch review have passed.** Automated tests and the production build passed, fixes are deployed, and the owner confirmed the remaining physical/live checks:
 
-1. Install on Android and iPhone, open online, then reopen offline from each home-screen icon and confirm records remain accessible.
-2. Final live cross-device regression on the updated deployment: same-business sync between devices and one offline sale that uploads once after reconnecting.
+1. Android and iPhone both install and reopen offline with workspace records accessible.
+2. The same test product appears on both phones with matching price and stock after syncing the same test business.
+3. The live email-reset message arrives, the password resets successfully and sign-in with the new password works (confirmed earlier).
 
-Phone, inbox and live cross-device checks need access to the relevant devices/accounts; desktop browser tests do not substitute for those checks.
+Physical/live results are owner-reported, not inferred from viewport emulation. Exactly-once offline-sale upload was verified in desktop Chrome and Worker tests; a physical-phone offline sale/reconnect was not specifically reported. Phone receipt/import handling, OS eviction/storage exhaustion, large-volume contention and an independent accessibility/security assessment remain broader verification limits. Email ownership verification and legacy-account email linking remain documented feature gaps. Optional Could-have features are not part of this acceptance result.
 
 ## Verification in this assessment
 
 - `npm.cmd test`: passed all four configured suites: business, sync, backup and offline. Offline storage/service-worker tests use controlled mocks, not real browser lifecycle tests.
 - Standard `npm.cmd run typecheck` encountered EPERM writing `tsconfig.tsbuildinfo`. `node node_modules/typescript/bin/tsc --noEmit --incremental false` then passed without writing that cache.
 - Existing upgrade notes describe earlier build/runtime passes; these are historical evidence, not fresh checks from this assessment.
-- No independent security audit, current dependency audit, live SMS test, production deployment, browser installation or visual/accessibility test was performed here.
+- Unit suites, isolated Worker/D1 runtime checks, real Chrome browser acceptance, TypeScript and production build passed during this review. Production pages/PWA assets/recovery configuration were checked, and the owner confirmed both phone checks and live email reset. No independent security audit, current dependency audit or live SMS test was performed.
 
 ## Release work in priority order
+
+Final acceptance recorded on 2 November 2026: owner reported "Both phones passed" for Android/iPhone installation and offline reopening with records visible, and "Yes, records match" for the same-business live product/price/stock sync. Both previously pending owner checks are now passed. This completes the agreed two-batch acceptance review for release `7907397`; earlier pending/local-only statements describe prior stages. The limitations above remain explicit rather than being treated as tested.
+
+Release `7907397` is committed, pushed to `main` and deployed to `https://dukatrack.alobiine.workers.dev`. Live checks pass for the updated manifest, all three PNG home-screen icons, home/forgot-password/reset-password pages and configured recovery validation. No business records were modified by those live checks. Owner has been asked to confirm installation/offline launch on both Android and iPhone and a same-test-business cross-device sync. Those two physical/live acceptance items remain pending until results are supplied. Earlier statements that these fixes are local describe previous stages and are superseded by this entry.
 
 Batch two automated checks passed in isolated Chrome: password change/current-password rejection/session revocation/new-password login; device-lock configuration, wrong passphrase rejection, offline unlock, reload locking and online same-account recovery; manifest parsing/Chrome installability; 390px/375px viewport reflow, visible button names and 44px targets; readable mobile form input sizes; modal focus trapping/Escape/focus restoration. Fixed undersized mobile controls, increased key mobile label sizes, added 192/512 PNG and Apple home-screen icons/metadata, and moved the device-lock control into Settings because its floating button covered the phone chart. Removed stale email-setup copy in Settings. Owner confirmed the full live email recovery flow. Unit suites, TypeScript, build and the browser regression pass. Physical-phone installation/offline launch and final updated live cross-device checks remain outstanding.
 

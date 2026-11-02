@@ -2,6 +2,8 @@
 
 An offline-first single-owner business workspace for Ugandan MSMEs. React/TypeScript, Vinext/Vite, Cloudflare Workers/D1 and IndexedDB. Money uses integer UGX and reporting uses Africa/Kampala.
 
+For everyday use, see [USER_GUIDE.md](USER_GUIDE.md).
+
 Start with [START_HERE.md](START_HERE.md) for Windows setup, safe upgrades, additive migration, testing, backup restoration and recovery-service configuration. [UPGRADE_NOTES.md](UPGRADE_NOTES.md) records stage results and verification limits.
 
 For hosting in your own Cloudflare account, see [CLOUDFLARE.md](CLOUDFLARE.md).
