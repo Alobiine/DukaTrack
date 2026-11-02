@@ -12,6 +12,7 @@ import { ReportsScreen } from "./screens/ReportsScreen";
 import { CreditScreen } from "./screens/CreditScreen";
 import { StockScreen } from "./screens/StockScreen";
 import { Brand, Field } from "./components/primitives";
+import { PasswordField } from "./components/PasswordField";
 ("use client");
 import { useWorkspaceUpdates } from "./components/useWorkspaceUpdates";
 import { CorrectionForm } from "./components/CorrectionForm";
@@ -514,10 +515,10 @@ export default function App() {
                 autoComplete="tel"
                 required
               />
-              <Field
+              <PasswordField
+                key={register ? "signup-password" : "signin-password"}
                 label="Password"
                 name="password"
-                type="password"
                 minLength={8}
                 maxLength={128}
                 autoComplete={register ? "new-password" : "current-password"}
@@ -970,10 +971,9 @@ export default function App() {
                     defaultValue={account.phone}
                     required
                   />
-                  <Field
+                  <PasswordField
                     label="Password"
                     name="password"
-                    type="password"
                     required
                   />
                   <button className="primary wide" disabled={authBusy}>
