@@ -63,11 +63,11 @@ export default defineConfig(async ({ command }) => {
         config: {
           ...localBindingConfig,
           services: [
-            ...(process.env.DUKATRACK_RECOVERY_SERVICE
+            ...(process.env.DUKATRACK_RECOVERY_EMAIL_SERVICE
               ? [
                   {
-                    binding: "RECOVERY_DELIVERY",
-                    service: process.env.DUKATRACK_RECOVERY_SERVICE,
+                    binding: "RECOVERY_EMAIL_DELIVERY",
+                    service: process.env.DUKATRACK_RECOVERY_EMAIL_SERVICE,
                   },
                 ]
               : []),

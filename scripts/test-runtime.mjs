@@ -92,11 +92,19 @@ try {
     await new Promise((r) => setTimeout(r, 500));
   }
   if (!ready) throw Error("Worker did not become ready: " + logs.slice(-3000));
+  for (const [route, heading] of [["/forgot-password", "Forgot password?"], ["/reset-password", "Set a new password"]]) {
+    const page = await fetch(origin + route);
+    assert.equal(page.status, 200);
+    const html = await page.text();
+    assert(html.includes(heading), route + " must render its heading");
+    assert(html.includes("Back to sign in"));
+    assert(!html.includes("<select"), "Recovery pages must not expose an action dropdown");
+  }
   const suffix = String(Date.now()).slice(-7),
     phone = "070" + suffix;
   const registration = await post("auth", {
     action: "register",
-    phone,
+    email: `runtime-${suffix}@example.com`,
     business: "Isolated runtime QA",
     owner: "QA",
     password: crypto.randomUUID(),
@@ -130,7 +138,7 @@ try {
   assert((await audit.json()).events.length > 0);
   assert.equal((await fetch(origin + "/sw.js")).status, 200);
   assert.equal(
-    (await post("recovery", { action: "request", phone })).status,
+    (await post("recovery", { action: "request", email: `runtime-${suffix}@example.com` })).status,
     503,
   );
   assert.equal((await post("auth", { action: "logout" }, cookie)).status, 200);

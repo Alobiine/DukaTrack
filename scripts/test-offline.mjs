@@ -63,6 +63,51 @@ await Promise.resolve();
 request.onsuccess();
 tx.oncomplete();
 assert.deepEqual(await successful, { sales: ["receipt"] });
+const read = storage.readLocal("shop");
+let retrieved = false;
+read.then(() => (retrieved = true));
+await Promise.resolve();
+request.result = { sales: ["receipt"], operations: ["pending-sale"] };
+request.onsuccess();
+await Promise.resolve();
+assert.equal(retrieved, false, "Reads must wait for transaction completion");
+tx.oncomplete();
+assert.deepEqual(await read, { sales: ["receipt"], operations: ["pending-sale"] });
+const missing = storage.readLocal("missing-shop");
+await Promise.resolve();
+request.result = undefined;
+request.onsuccess();
+tx.oncomplete();
+assert.equal(await missing, undefined);
+const blocked = storage.writeLocal("shop", {});
+await Promise.resolve();
+opened.onblocked();
+await assert.rejects(blocked, /blocked/);
+const quotaFailure = storage.writeLocal("shop", {});
+await Promise.resolve();
+tx.onerror();
+await assert.rejects(quotaFailure, /not been saved/);
+const originalChannel = globalThis.BroadcastChannel;
+try {
+  for (const failure of ["constructor", "postMessage"]) {
+    let channelClosed = false;
+    globalThis.BroadcastChannel = class {
+      constructor() {
+        if (failure === "constructor") throw Error("Channel unavailable");
+      }
+      postMessage() { throw Error("Notification failed"); }
+      close() { channelClosed = true; }
+    };
+    const committed = storage.writeLocal("shop", { sales: ["saved"] });
+    await Promise.resolve();
+    request.onsuccess();
+    tx.oncomplete();
+    assert.deepEqual(await committed, { sales: ["saved"] });
+    if (failure === "postMessage") assert.equal(channelClosed, true);
+  }
+} finally {
+  globalThis.BroadcastChannel = originalChannel;
+}
 const failed = storage.readLocal("shop");
 await Promise.resolve();
 opened.onerror();
@@ -105,6 +150,9 @@ const context = {
   },
   fetch: async (request) => {
     if (offline) throw Error("No network");
+    if (request.mode === "navigate" && new URL(request.url).pathname === "/forgot-password") {
+      return new Response("<html>Forgot password</html>", { headers: { "Content-Type": "text/html" } });
+    }
     return request.headers.get("rsc")
       ? new Response("rsc", { headers: { "Content-Type": "text/x-component" } })
       : request.mode === "navigate"
@@ -137,12 +185,15 @@ assert.equal(
 await fetchEvent("/?_rsc=1", "cors", { rsc: "1" });
 assert.equal(await cache.get("/").clone().text(), "<html>Shell</html>");
 await fetchEvent("/app.js");
+assert.equal(await (await fetchEvent("/forgot-password", "navigate")).text(), "<html>Forgot password</html>");
+assert.equal(await cache.get("/").clone().text(), "<html>Shell</html>", "Recovery navigation must not replace the offline homepage");
 offline = true;
+assert.equal(await (await fetchEvent("/forgot-password", "navigate")).text(), "<html>Forgot password</html>");
 assert.equal(
   await (await fetchEvent("/", "navigate")).text(),
   "<html>Shell</html>",
 );
 assert.equal(await (await fetchEvent("/app.js")).text(), "asset");
 console.log(
-  "PASS: IndexedDB commit/abort/open failures; service-worker offline shell/assets and API/RSC exclusion. Browser lifecycle testing remains manual.",
+  "PASS: IndexedDB committed writes/reads, missing records, abort/open/blocked/storage failures and notification failures; service-worker offline shell/assets and API/RSC exclusion. Browser lifecycle testing remains manual.",
 );

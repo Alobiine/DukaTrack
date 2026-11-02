@@ -50,7 +50,7 @@ const uid = () =>
   Array.from(crypto.getRandomValues(new Uint8Array(16)))
     .map((x) => x.toString(16).padStart(2, "0"))
     .join("");
-type Account = { id: string; business: string; owner: string; phone: string };
+type Account = { id: string; business: string; owner: string; phone: string | null; email?: string | null };
 import { synchronise, blank, type Bundle, type Reply } from "../lib/sync";
 const nav = [
   ["Home", LayoutDashboard],
@@ -73,6 +73,7 @@ export default function App() {
     [notice, setNotice] = useState(""),
     [error, setError] = useState(""),
     [register, setRegister] = useState(false),
+    [legacyLogin, setLegacyLogin] = useState(false),
     [authBusy, setAuthBusy] = useState(false),
     [cart, setCart] = useState<Record<string, number>>({}),
     [method, setMethod] = useState("Cash"),
@@ -484,6 +485,7 @@ export default function App() {
                 className={register ? "active" : ""}
                 onClick={() => {
                   setRegister(true);
+                  setLegacyLogin(false);
                   setError("");
                 }}
               >
@@ -496,7 +498,7 @@ export default function App() {
                   <Field
                     label="Business name"
                     name="business"
-                    placeholder="e.g. Aloysious General Store"
+                    placeholder="Enter your business name"
                     required
                   />
                   <Field
@@ -508,11 +510,11 @@ export default function App() {
                 </>
               )}
               <Field
-                label="Phone number"
-                name="phone"
-                type="tel"
-                placeholder="0772 123 456"
-                autoComplete="tel"
+                label={legacyLogin ? "Registered phone number" : "Email address"}
+                name={legacyLogin ? "phone" : "email"}
+                type={legacyLogin ? "tel" : "email"}
+                placeholder={legacyLogin ? "Enter your registered phone" : "Enter your email address"}
+                autoComplete="username"
                 required
               />
               <PasswordField
@@ -525,6 +527,11 @@ export default function App() {
                 placeholder="At least 8 characters"
                 required
               />
+              {!register && (
+                <div className="auth-password-help">
+                  <a href="/forgot-password">Forgot password?</a>
+                </div>
+              )}
               {error && (
                 <div role="alert" className="error">
                   {error}
@@ -539,19 +546,19 @@ export default function App() {
                 <ArrowUpRight size={18} />
               </button>
             </form>
+            {!register && (
+              <button className="textbutton" onClick={() => { setLegacyLogin(!legacyLogin); setError(""); }}>
+                {legacyLogin ? "Sign in with email" : "Already have a phone-based account?"}
+              </button>
+            )}
             <p className="authnote">
               <ShieldCheck size={17} /> Your business has its own private
               workspace.
             </p>
             <small className="muted">
               Internet is required to create an account or sign in. Once opened
-              on this device, your workspace is available offline. Recovery
-              requires a configured delivery service.
+              on this device, your workspace is available offline.
             </small>
-            <details>
-              <summary>Recover account</summary>
-              <AccountSecurity mode="recover" />
-            </details>
           </div>
         </section>
       </div>
@@ -898,7 +905,7 @@ export default function App() {
                         {
                           product: selected ? "Edit product" : "Add product",
                           adjust: "Adjust stock",
-                          customer: "Add customer",
+                          customer: selected ? "Edit customer" : "Add customer",
                           payment: "Record credit payment",
                           sale: "New sale",
                           receipt: "Sale receipt",
@@ -966,9 +973,10 @@ export default function App() {
               {modal === "reauth" && (
                 <form onSubmit={auth}>
                   <Field
-                    label="Phone number"
-                    name="phone"
-                    defaultValue={account.phone}
+                    label={account.email ? "Email address" : "Registered phone number"}
+                    name={account.email ? "email" : "phone"}
+                    type={account.email ? "email" : "tel"}
+                    defaultValue={account.email || account.phone || ""}
                     required
                   />
                   <PasswordField
@@ -992,7 +1000,7 @@ export default function App() {
                       id: selected?.id || uid(),
                       name: f.name,
                       price: +f.price,
-                      quantity: selected?.quantity || +f.quantity,
+                      quantity: selected?.quantity ?? +f.quantity,
                       threshold: +f.threshold,
                       base: selected?.updatedAt,
                       baseRevision: selected?.revision,
@@ -1111,26 +1119,29 @@ export default function App() {
                     const f: any = Object.fromEntries(
                       new FormData(e.currentTarget),
                     );
-                    mutate("customer", {
-                      id: uid(),
+                    mutate(selected ? "customer-edit" : "customer", {
+                      id: selected?.id || uid(),
                       name: f.name,
                       phone: f.phone,
+                      ...(selected ? { base: { name: selected.name, phone: selected.phone } } : {}),
                     });
                   }}
                 >
                   <Field
                     label="Customer name"
                     name="name"
+                    defaultValue={selected?.name}
                     required
                     maxLength={120}
                   />
                   <Field
                     label="Phone number (optional)"
                     name="phone"
+                    defaultValue={selected?.phone}
                     type="tel"
                     maxLength={25}
                   />
-                  <button className="primary wide">Add customer</button>
+                  <button className="primary wide">{selected ? "Save changes" : "Add customer"}</button>
                 </form>
               )}
               {modal === "payment" && (
@@ -1488,6 +1499,9 @@ export default function App() {
                     Record payment
                   </button>
                   <h3 className="sectiontitle">Credit & payment history</h3>
+                  <button className="secondary wide" onClick={() => open("customer", selected)}>
+                    Edit customer details
+                  </button>
                   <div className="reportlist">
                     {[
                       ...s.sales

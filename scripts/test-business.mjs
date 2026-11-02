@@ -7,6 +7,27 @@ import { DatabaseSync } from "node:sqlite";
 import { readFileSync, readdirSync } from "node:fs";
 import assert from "node:assert/strict";
 const db = new DatabaseSync(":memory:");
+// Check the email upgrade against populated accounts with foreign keys enabled.
+{
+  const upgrade = new DatabaseSync(":memory:");
+  upgrade.exec("PRAGMA foreign_keys=ON");
+  const migrations = readdirSync("drizzle").filter((x) => x.endsWith(".sql")).sort();
+  for (const file of migrations.filter((x) => x < "0003")) {
+    upgrade.exec(readFileSync("drizzle/" + file, "utf8").replaceAll("--> statement-breakpoint", ""));
+  }
+  upgrade.exec("INSERT INTO accounts(id,phone,owner,business,password,salt,created_at) VALUES('preserved','256700000099','Owner','Shop','digest','salt',1)");
+  upgrade.exec("INSERT INTO sessions(token,account_id,expires) VALUES('session','preserved',9999999999999)");
+  upgrade.prepare("INSERT INTO workspaces(account_id,version,data) VALUES(?, ?, ?)").run("preserved", 4, '{"saved":"records"}');
+  upgrade.exec("BEGIN");
+  upgrade.exec(readFileSync("drizzle/0003_email_accounts.sql", "utf8").replaceAll("--> statement-breakpoint", ""));
+  upgrade.exec("COMMIT");
+  assert.equal(upgrade.prepare("SELECT password FROM accounts WHERE id='preserved'").get().password, "digest");
+  assert.equal(upgrade.prepare("SELECT phone FROM accounts WHERE id='preserved'").get().phone, "256700000099");
+  assert.equal(upgrade.prepare("SELECT data FROM workspaces WHERE account_id='preserved'").get().data, '{"saved":"records"}');
+  assert.equal(upgrade.prepare("SELECT count(*) AS total FROM sessions").get().total, 1);
+  assert.deepEqual(upgrade.prepare("PRAGMA foreign_key_check").all(), []);
+  upgrade.close();
+}
 for (const file of readdirSync("drizzle")
   .filter((x) => x.endsWith(".sql"))
   .sort())
@@ -94,6 +115,17 @@ const user = {
   owner: "QA Owner",
   password: crypto.randomUUID(),
 };
+// Email accounts need no phone and email matching ignores case/outer whitespace.
+const emailUser = { action: "register", email: " Owner@Example.com ", business: "Email shop", owner: "Owner", password: crypto.randomUUID() };
+const emailRegistered = await auth.POST(req("auth", emailUser));
+assert.equal(emailRegistered.status, 200, await emailRegistered.clone().text());
+const emailAccount = (await emailRegistered.json()).account;
+assert.equal(emailAccount.email, "owner@example.com");
+assert.equal(emailAccount.phone, null);
+assert.equal((await auth.POST(req("auth", { ...emailUser, email: "OWNER@example.com" }))).status, 409);
+assert.equal((await auth.POST(req("auth", { ...emailUser, email: "not-an-email" }))).status, 400);
+assert.equal((await auth.POST(req("auth", { action: "login", email: "OWNER@example.com", password: emailUser.password }))).status, 200);
+assert.equal((await auth.POST(req("auth", { action: "login", email: emailUser.email, password: "incorrect-password" }))).status, 401);
 let r = await auth.POST(req("auth", user));
 assert.equal(r.status, 200);
 const cookie = r.headers.get("set-cookie").split(";")[0];
@@ -122,6 +154,19 @@ assert.equal(d.accepted.length, 4);
 assert.equal(d.state.products[0].quantity, 8);
 assert.equal(d.state.sales.length, 1);
 assert.equal(d.state.payments[0].amount, 4000);
+const customerEdit = op("edit-customer", "customer-edit", {
+  id: "grace", name: "Grace Updated", phone: "0700000000",
+  base: { name: "Grace", phone: "" },
+});
+r = await sync.POST(req("sync", { operations: [customerEdit] }, cookie));
+d = await r.json();
+assert.equal(d.accepted[0], customerEdit.id);
+assert.equal(d.state.customers[0].name, "Grace Updated");
+r = await sync.POST(req("sync", { operations: [] }, cookie));
+d = await r.json();
+assert.equal(d.state.customers[0].phone, "0700000000", "Edited details must persist in relational storage");
+assert.equal(d.state.sales[0].customerId, "grace");
+assert.equal(d.state.payments[0].customerId, "grace");
 r = await sync.POST(req("sync", { operations }, cookie));
 d = await r.json();
 assert.equal(d.state.sales.length, 1);
@@ -193,6 +238,7 @@ r = await sync.POST(req("sync", { operations: [] }, otherCookie));
 d = await r.json();
 assert.equal(d.state.products.length, 0);
 for (let n = 0; n < 3; n++) {
+  const attemptStarted = Date.now();
   r = await auth.POST(
     req("auth", {
       action: "login",
@@ -201,11 +247,39 @@ for (let n = 0; n < 3; n++) {
     }),
   );
   assert.equal(r.status, 401);
+  const failureState = db.prepare("SELECT failures,locked_until FROM accounts WHERE id=?").get(account.id);
+  if (n < 2) {
+    assert.equal(failureState.failures, n + 1);
+    assert.equal(failureState.locked_until, 0);
+  } else {
+    assert(failureState.locked_until >= attemptStarted + 30000);
+    assert(failureState.locked_until <= Date.now() + 30000);
+  }
 }
 r = await auth.POST(
   req("auth", { action: "login", phone: user.phone, password: user.password }),
 );
 assert.equal(r.status, 429);
+// Verify the exact lockout boundary without waiting or touching real accounts.
+const lock = db.prepare("SELECT locked_until FROM accounts WHERE id=?").get(account.id);
+const originalNow = Date.now;
+try {
+  Date.now = () => lock.locked_until - 1;
+  r = await auth.POST(
+    req("auth", { action: "login", phone: user.phone, password: user.password }),
+  );
+  assert.equal(r.status, 429, "Correct password must not bypass an active lock");
+  Date.now = () => lock.locked_until;
+  r = await auth.POST(
+    req("auth", { action: "login", phone: user.phone, password: user.password }),
+  );
+  assert.equal(r.status, 200, "Sign-in must resume when the lock expires");
+  const unlocked = db.prepare("SELECT failures,locked_until FROM accounts WHERE id=?").get(account.id);
+  assert.equal(unlocked.failures, 0);
+  assert.equal(unlocked.locked_until, 0);
+} finally {
+  Date.now = originalNow;
+}
 // Existing documents migrate lazily without altering the original snapshot.
 const legacyRegistration = await auth.POST(
   req("auth", { ...user, phone: "0700000003", business: "Legacy shop" }),
@@ -362,17 +436,60 @@ assert.equal(
   (await sync.POST(req("sync", { operations: [] }, otherCookie))).status,
   401,
 );
+db.prepare("UPDATE accounts SET email=? WHERE phone=?").run("other@example.com", "256700000002");
+db.prepare("UPDATE accounts SET email=? WHERE phone=?").run("legacy@example.com", "256700000003");
 const recovery = await route("recovery");
+// Brevo integration uses fake credentials and a mocked HTTP provider only.
+{
+  const emailModule = await route("lib/recovery-email.ts");
+  const config = { BREVO_API_KEY: "fake-provider-key", BREVO_SENDER_EMAIL: "sender@example.com", DUKATRACK_APP_URL: "https://duka.test" };
+  assert.equal(emailModule.recoveryEmailConfigured(config), true);
+  assert.equal(emailModule.recoveryEmailConfigured({ ...config, DUKATRACK_APP_URL: "http://public.example" }), false);
+  assert.equal(emailModule.recoveryEmailConfigured({ ...config, DUKATRACK_APP_URL: "https://user:password@duka.test" }), false);
+  assert.equal(emailModule.recoveryEmailConfigured({ ...config, BREVO_API_KEY: "" }), false);
+  const originalFetch = globalThis.fetch;
+  let sent, providerCalls = 0;
+  Object.assign(globalThis.__dukaTestEnv, config);
+  try {
+    globalThis.fetch = async (url, options) => {
+      providerCalls++;
+      assert.equal(url, "https://api.brevo.com/v3/smtp/email");
+      assert.equal(options.headers["api-key"], config.BREVO_API_KEY);
+      sent = JSON.parse(options.body);
+      return Response.json({ messageId: "fake-message-id" }, { status: 201 });
+    };
+    const requested = await recovery.POST(req("recovery", { action: "request", email: "OWNER@EXAMPLE.COM" }));
+    assert.equal(requested.status, 200);
+    assert.equal(sent.to[0].email, "owner@example.com");
+    assert.equal(sent.sender.email, "sender@example.com");
+    const link = sent.textContent.match(/https:\/\/duka\.test\/reset-password#token=([a-f0-9]{64})/);
+    assert(link, "Email must contain the trusted reset link");
+    assert(!JSON.stringify(await requested.json()).includes(link[1]), "Never return a reset token to the requesting browser");
+    assert.equal((await recovery.POST(req("recovery", { action: "reset", token: link[1], newPassword: "email-reset-password" }))).status, 200);
+    const callsBefore = providerCalls;
+    assert.equal((await recovery.POST(req("recovery", { action: "request", email: "unknown@example.com" }))).status, 200);
+    assert.equal(providerCalls, callsBefore, "Unknown accounts must not receive mail");
+    globalThis.fetch = async () => new Response("Provider rejection", { status: 401 });
+    assert.equal(await emailModule.sendRecoveryEmail(config, "owner@example.com", "a".repeat(64)), false);
+    globalThis.fetch = async () => Response.json({});
+    assert.equal(await emailModule.sendRecoveryEmail(config, "owner@example.com", "a".repeat(64)), false);
+    globalThis.fetch = async () => { throw Error("Network error"); };
+    assert.equal(await emailModule.sendRecoveryEmail(config, "owner@example.com", "a".repeat(64)), false);
+  } finally {
+    globalThis.fetch = originalFetch;
+    for (const key of Object.keys(config)) delete globalThis.__dukaTestEnv[key];
+  }
+}
 assert.equal(
   (
     await recovery.POST(
-      req("recovery", { action: "request", phone: "0700000002" }),
+      req("recovery", { action: "request", email: "other@example.com" }),
     )
   ).status,
   503,
 );
 let delivered;
-globalThis.__dukaTestEnv.RECOVERY_DELIVERY = {
+globalThis.__dukaTestEnv.RECOVERY_EMAIL_DELIVERY = {
   async fetch(url, options) {
     delivered = JSON.parse(options.body);
     return new Response("{}");
@@ -381,7 +498,7 @@ globalThis.__dukaTestEnv.RECOVERY_DELIVERY = {
 assert.equal(
   (
     await recovery.POST(
-      req("recovery", { action: "request", phone: "0700000002" }),
+      req("recovery", { action: "request", email: "other@example.com" }),
     )
   ).status,
   200,
@@ -390,7 +507,7 @@ assert.equal(delivered.token.length, 64);
 assert.equal(
   (
     await recovery.POST(
-      req("recovery", { action: "request", phone: "0700000002" }),
+      req("recovery", { action: "request", email: "other@example.com" }),
     )
   ).status,
   429,
@@ -450,7 +567,7 @@ assert.equal(
 assert.equal(
   (
     await recovery.POST(
-      req("recovery", { action: "request", phone: "0700000003" }),
+      req("recovery", { action: "request", email: "legacy@example.com" }),
     )
   ).status,
   200,

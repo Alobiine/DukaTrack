@@ -10,7 +10,8 @@ import {
 } from "drizzle-orm/sqlite-core";
 export const accounts = sqliteTable("accounts", {
   id: text("id").primaryKey(),
-  phone: text("phone").notNull().unique(),
+  phone: text("phone").unique(),
+  email: text("email").unique(),
   owner: text("owner").notNull(),
   business: text("business").notNull(),
   password: text("password").notNull(),

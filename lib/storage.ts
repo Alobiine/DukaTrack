@@ -38,9 +38,17 @@ function transact<T>(key: string, value?: T): Promise<T | undefined> {
         tx.oncomplete = () => {
           db.close();
           if (value !== undefined && typeof BroadcastChannel !== "undefined") {
-            const channel = new BroadcastChannel("dukatrack-updates");
-            channel.postMessage({ key });
-            channel.close();
+            // A notification failure must not hide an already-committed save.
+            try {
+              const channel = new BroadcastChannel("dukatrack-updates");
+              try {
+                channel.postMessage({ key });
+              } finally {
+                channel.close();
+              }
+            } catch {
+              // Other tabs also refresh when focused.
+            }
           }
           resolve(result);
         };

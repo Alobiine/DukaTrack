@@ -248,6 +248,17 @@ export function apply(input: State, op: Operation): State {
       s.adjustments.push({ ...p, productId: p.id, at: op.at, id: op.id });
       break;
     }
+    case "customer-edit": {
+      const customer = s.customers.find((x) => x.id === p.id);
+      if (!customer) throw Error("Customer not found.");
+      if (!label(p.name) || typeof p.phone !== "string" || p.phone.length > 25)
+        throw Error("Enter valid customer details.");
+      if (p.base?.name !== customer.name || p.base?.phone !== customer.phone)
+        throw Error("This customer changed on another device. Refresh and try again.");
+      customer.name = p.name.trim();
+      customer.phone = p.phone.trim();
+      break;
+    }
     case "customer": {
       if (
         !label(p.name) ||

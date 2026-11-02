@@ -7,6 +7,7 @@ export function AccountSecurity({
   onComplete?: () => void;
 }) {
   const [message, setMessage] = useState(""),
+    [action, setAction] = useState("request"),
     [busy, setBusy] = useState(false);
   async function submit(e: FormEvent<HTMLFormElement>) {
     e.preventDefault();
@@ -52,22 +53,25 @@ export function AccountSecurity({
         <>
           <label className="field">
             Action
-            <select name="action">
-              <option value="request">Send recovery token</option>
-              <option value="reset">Reset with received token</option>
+            <select name="action" value={action} onChange={(e) => { setAction(e.target.value); setMessage(""); }}>
+              <option value="request">Send recovery email</option>
+              <option value="reset">Reset with emailed token</option>
             </select>
           </label>
-          <label className="field">
-            Registered phone
-            <input name="phone" type="tel" />
-          </label>
-          <label className="field">
-            Recovery token (for reset)
-            <input name="token" autoComplete="off" maxLength={64} />
-          </label>
+          {action === "request" ? (
+            <label className="field">
+              Registered email address
+              <input name="email" type="email" autoComplete="email" maxLength={254} required />
+            </label>
+          ) : (
+            <label className="field">
+              Recovery token from your email
+              <input name="token" autoComplete="off" minLength={64} maxLength={64} required />
+            </label>
+          )}
         </>
       )}
-      <label className="field">
+      {(mode === "change" || action === "reset") && <label className="field">
         New password{mode === "recover" ? " (for reset)" : ""}
         <input
           name="newPassword"
@@ -75,15 +79,15 @@ export function AccountSecurity({
           autoComplete="new-password"
           minLength={8}
           maxLength={128}
-          required={mode === "change"}
+          required
         />
-      </label>
+      </label>}
       <button className="primary wide" disabled={busy}>
         {busy
           ? "Please wait..."
           : mode === "change"
             ? "Change password and revoke sessions"
-            : "Continue recovery"}
+            : action === "request" ? "Send recovery email" : "Reset password"}
       </button>
       <p role="status">{message}</p>
     </form>

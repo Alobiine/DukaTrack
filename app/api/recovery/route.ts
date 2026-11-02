@@ -1,6 +1,8 @@
 import { boundedJson } from "../../../lib/http";
 import { env } from "cloudflare:workers";
 import { hash, password } from "../auth/route";
+import { normalizeEmail } from "../../../lib/email";
+import { recoveryEmailConfigured, sendRecoveryEmail } from "../../../lib/recovery-email";
 export async function POST(request: Request) {
   const out = (d: object, status = 200) =>
     Response.json(d, { status, headers: { "Cache-Control": "no-store" } });
@@ -9,26 +11,24 @@ export async function POST(request: Request) {
   try {
     const p = (await boundedJson(request, 10000)) as {
       action?: string;
-      phone?: string;
+      email?: string;
       token?: string;
       newPassword?: string;
     };
     const db = env.DB!;
     if (p.action === "request") {
-      if (!env.RECOVERY_DELIVERY)
+      if (!recoveryEmailConfigured(env) && !env.RECOVERY_EMAIL_DELIVERY)
         return out(
           {
             error:
-              "Password recovery delivery is not configured. Contact your business administrator.",
+              "Password recovery email is not configured yet. Contact your business administrator.",
           },
           503,
         );
-      const phone = String(p.phone || "")
-        .replace(/[\s+-]/g, "")
-        .replace(/^0/, "256");
-      if (!/^256\d{9}$/.test(phone))
-        return out({ error: "Enter a valid Ugandan phone number." }, 400);
-      const subject = await hash("recovery:" + phone),
+      const email = normalizeEmail(p.email);
+      if (!email)
+        return out({ error: "Enter a valid email address." }, 400);
+      const subject = await hash("recovery-email:" + email),
         now = Date.now();
       const gate = await db
         .prepare(
@@ -44,8 +44,8 @@ export async function POST(request: Request) {
           429,
         );
       const a = await db
-        .prepare("SELECT id FROM accounts WHERE phone=?")
-        .bind(phone)
+        .prepare("SELECT id FROM accounts WHERE email=?")
+        .bind(email)
         .first<{ id: string }>();
       if (a) {
         const token = Array.from(crypto.getRandomValues(new Uint8Array(32)))
@@ -57,12 +57,14 @@ export async function POST(request: Request) {
           )
           .bind(await hash(token), a.id, now + 900000, now)
           .run();
-        const response = await env.RECOVERY_DELIVERY.fetch(
+        const response = recoveryEmailConfigured(env)
+          ? { ok: await sendRecoveryEmail(env, email, token) }
+          : await env.RECOVERY_EMAIL_DELIVERY!.fetch(
           "https://recovery.internal/deliver",
           {
             method: "POST",
             headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ phone, token, expiresAt: now + 900000 }),
+            body: JSON.stringify({ email, token, expiresAt: now + 900000 }),
           },
         );
         if (!response.ok) {
@@ -79,7 +81,7 @@ export async function POST(request: Request) {
       return out({
         ok: true,
         message:
-          "If this account exists, a recovery token has been sent to its registered phone.",
+          "If this account exists, a recovery email has been sent. Check your inbox and spam folder.",
       });
     }
     if (

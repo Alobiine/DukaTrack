@@ -134,7 +134,9 @@ export function DeviceLock({
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           action: "login",
-          phone: f.get("phone"),
+          ...(String(f.get("identifier")).includes("@")
+            ? { email: f.get("identifier") }
+            : { phone: f.get("identifier") }),
           password: f.get("password"),
         }),
       });
@@ -196,8 +198,8 @@ export function DeviceLock({
         {recover && (
           <form onSubmit={recoverLock}>
             <label className="field">
-              Registered phone
-              <input name="phone" type="tel" required />
+              Email or existing account phone
+              <input name="identifier" autoComplete="username" required />
             </label>
             <label className="field">
               Account password

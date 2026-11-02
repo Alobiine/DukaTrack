@@ -1,6 +1,7 @@
 import { boundedJson } from "../../../lib/http";
 import { env } from "cloudflare:workers";
 import { empty } from "../../../lib/domain";
+import { normalizeEmail } from "../../../lib/email";
 const hex = (a: ArrayBuffer) =>
   Array.from(new Uint8Array(a))
     .map((x) => x.toString(16).padStart(2, "0"))
@@ -40,7 +41,7 @@ export async function account(request: Request) {
   if (!token) return null;
   return await env
     .DB!.prepare(
-      "SELECT a.id,a.business,a.owner,a.phone FROM sessions s JOIN accounts a ON a.id=s.account_id WHERE s.token=? AND s.expires>?",
+      "SELECT a.id,a.business,a.owner,a.phone,a.email FROM sessions s JOIN accounts a ON a.id=s.account_id WHERE s.token=? AND s.expires>?",
     )
     .bind(await hash(token), Date.now())
     .first();
@@ -124,27 +125,29 @@ export async function POST(request: Request) {
     const phone = String(p.phone || "")
       .replace(/[\s+-]/g, "")
       .replace(/^0/, "256");
+    const usesEmail = p.email !== undefined;
+    const email = usesEmail ? normalizeEmail(p.email) : null;
     if (
-      !/^256\d{9}$/.test(phone) ||
+      (usesEmail ? !email : !/^256\d{9}$/.test(phone)) ||
       typeof p.password !== "string" ||
       p.password.length < 8 ||
       p.password.length > 128
     )
       return json(
         {
-          error:
+          error: usesEmail ? "Use a valid email and a password of 8-128 characters." :
             "Use a Ugandan phone number and a password of 8–128 characters.",
         },
         400,
       );
     let a: any = await db
-      .prepare("SELECT * FROM accounts WHERE phone=?")
-      .bind(phone)
+      .prepare(usesEmail ? "SELECT * FROM accounts WHERE email=?" : "SELECT * FROM accounts WHERE phone=?")
+      .bind(usesEmail ? email : phone)
       .first();
     if (p.action === "register") {
       if (a)
         return json(
-          { error: "This phone number is registered. Sign in instead." },
+          { error: "This account is registered. Sign in instead." },
           409,
         );
       if (
@@ -163,11 +166,12 @@ export async function POST(request: Request) {
         await db.batch([
           db
             .prepare(
-              "INSERT INTO accounts(id,phone,owner,business,password,salt,created_at) VALUES(?,?,?,?,?,?,?)",
+              "INSERT INTO accounts(id,phone,email,owner,business,password,salt,created_at) VALUES(?,?,?,?,?,?,?,?)",
             )
             .bind(
               id,
-              phone,
+              usesEmail ? null : phone,
+              email,
               p.owner.trim(),
               p.business.trim(),
               digest,
@@ -184,16 +188,16 @@ export async function POST(request: Request) {
       } catch {
         return json(
           {
-            error: "Could not register. This number may already be registered.",
+            error: "Could not register. This account may already be registered.",
           },
           409,
         );
       }
-      a = { id, business: p.business.trim(), owner: p.owner.trim(), phone };
+      a = { id, business: p.business.trim(), owner: p.owner.trim(), phone: usesEmail ? null : phone, email };
     } else {
       if (!a) {
         await password(p.password, "unregistered");
-        return json({ error: "Incorrect phone number or password." }, 401);
+        return json({ error: "Incorrect sign-in details." }, 401);
       }
       if (a.locked_until > Date.now())
         return json(
@@ -238,6 +242,7 @@ export async function POST(request: Request) {
           business: a.business,
           owner: a.owner,
           phone: a.phone,
+          email: a.email,
         },
       },
       200,

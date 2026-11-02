@@ -1,7 +1,7 @@
 import { Download, Store, LogOut } from "lucide-react";
 
 type Props = {
-  account: { business: string; owner: string; phone: string };
+  account: { business: string; owner: string; phone: string | null; email?: string | null };
   install: { prompt: () => Promise<unknown> } | null;
   backup: () => void;
   open: (name: string) => void;
@@ -34,8 +34,8 @@ export function SettingsScreen({
             <b>{account.owner}</b>
           </div>
           <div>
-            <small>Phone number</small>
-            <b>+{account.phone}</b>
+            <small>{account.email ? "Email address" : "Phone number"}</small>
+            <b>{account.email || (account.phone ? "+" + account.phone : "Not provided")}</b>
           </div>
           <div>
             <small>Language</small>
@@ -83,8 +83,9 @@ export function SettingsScreen({
             Sign out
           </button>
           <small>
-            App release 0.1 · Early implementation. Recovery, multi-user roles,
-            restore and full security testing are still pending.
+            App release 0.1 · Backup restoration is available. Account recovery
+            requires email delivery setup. Multi-user roles and full security
+            testing are still pending.
           </small>
         </div>
       </section>

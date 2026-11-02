@@ -17,6 +17,7 @@ self.addEventListener("fetch", (event) => {
   )
     return;
   const asset = /\.(js|css|svg|png|webmanifest)$/.test(u.pathname);
+  const cacheKey = r.mode === "navigate" ? u.pathname : r;
   if (r.mode !== "navigate" && !asset) return;
   event.respondWith(
     (async () => {
@@ -29,13 +30,13 @@ self.addEventListener("fetch", (event) => {
           (asset || response.headers.get("content-type")?.includes("text/html"))
         ) {
           await cache
-            .put(r.mode === "navigate" ? "/" : r, response.clone())
+            .put(cacheKey, response.clone())
             .catch(() => {});
         }
         return response;
       } catch {
         return (
-          (await caches.match(r.mode === "navigate" ? "/" : r)) ||
+          (await caches.match(cacheKey)) ||
           Response.error()
         );
       }
