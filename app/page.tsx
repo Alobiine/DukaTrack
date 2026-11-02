@@ -2,6 +2,7 @@
 
 import { snapshotSale } from "../lib/domain";
 import { salesCsv } from "../lib/export";
+import { creditHistory, inSalesPeriod } from "../lib/reporting";
 import { SalesScreen } from "./screens/SalesScreen";
 import { HomeScreen } from "./screens/HomeScreen";
 
@@ -17,7 +18,7 @@ import { PasswordField } from "./components/PasswordField";
 import { useWorkspaceUpdates } from "./components/useWorkspaceUpdates";
 import { CorrectionForm } from "./components/CorrectionForm";
 
-import { mergeBackup, sameRecords, type Backup } from "../lib/backup";
+import { createBackup, mergeBusinessBackup, sameRecords, type Backup } from "../lib/backup";
 import { AccountSecurity } from "./components/AccountSecurity";
 import { DeviceLock } from "./components/DeviceLock";
 import { useModalFocus } from "./components/ModalFocus";
@@ -70,6 +71,7 @@ export default function App() {
     [filter, setFilter] = useState("Today"),
     [online, setOnline] = useState(true),
     [syncing, setSyncing] = useState(false),
+    [syncError, setSyncError] = useState(""),
     [notice, setNotice] = useState(""),
     [error, setError] = useState(""),
     [register, setRegister] = useState(false),
@@ -116,6 +118,7 @@ export default function App() {
     await writeLocal("last-account", a);
     setBundle(b || blank());
     setAccount(a);
+    setSyncError("");
     navigator.storage?.persist?.().catch(() => {});
   }
   useEffect(() => {
@@ -174,6 +177,7 @@ export default function App() {
     if (!aRef.current || !navigator.onLine || busy.current) return;
     busy.current = true;
     setSyncing(true);
+    setSyncError("");
     setError("");
     try {
       await locked(async () => {
@@ -199,11 +203,9 @@ export default function App() {
         );
       });
     } catch (e) {
-      setError(
-        e instanceof Error
-          ? e.message
-          : "Sync unavailable. Pending records remain on this device.",
-      );
+      const message = e instanceof Error ? e.message : "Sync unavailable. Pending records remain on this device.";
+      setError(message);
+      setSyncError(message);
     } finally {
       busy.current = false;
       setSyncing(false);
@@ -323,22 +325,18 @@ export default function App() {
     a.click();
     setTimeout(() => URL.revokeObjectURL(u), 1000);
   }
-  function backup() {
-    download(
-      "DukaTrack-" + nowDay() + ".json",
-      JSON.stringify(
-        {
-          format: "dukatrack-v1",
-          schemaVersion: 1,
-          business: account,
-          exportedAt: Date.now(),
-          ...bundle,
-        },
-        null,
-        2,
-      ),
-    );
-    flash("Backup exported. Store it somewhere safe.");
+  async function backup() {
+    setError("");
+    try {
+      await locked(async () => {
+        const a = aRef.current!;
+        const latest: Bundle = (await readLocal(a.id)) || blank();
+        download("DukaTrack-" + nowDay() + ".json", JSON.stringify(createBackup(a, latest), null, 2));
+      });
+      flash("Backup download started. Store the file somewhere safe.");
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Could not export backup. Your records have not changed.");
+    }
   }
   async function restoreBackup(source: Backup) {
     setError("");
@@ -346,7 +344,7 @@ export default function App() {
       await locked(async () => {
         const a = aRef.current!;
         const current: Bundle = (await readLocal(a.id)) || blank();
-        const merged = mergeBackup(current.state, source.state);
+        const merged = mergeBusinessBackup(current.state, source, a.id);
         if (
           sameRecords(
             { ...current.state, corrections: current.state.corrections || [] },
@@ -356,13 +354,7 @@ export default function App() {
           throw Error(
             "This backup is already present. No records were imported.",
           );
-        const safety = {
-          format: "dukatrack-v1",
-          schemaVersion: 1,
-          business: a,
-          exportedAt: Date.now(),
-          ...current,
-        };
+        const safety = createBackup(a, current);
         await writeLocal("safety-backup:" + a.id + ":" + Date.now(), safety);
         download(
           "DukaTrack-safety-" + Date.now() + ".json",
@@ -394,9 +386,11 @@ export default function App() {
     download("DukaTrack-sales.csv", salesCsv(s), "text/csv");
   }
   const syncLabel = !online
-    ? `Offline ? ${bundle.operations.length} pending`
+    ? `Offline · ${bundle.operations.length} pending`
     : syncing
       ? "Syncing"
+      : syncError
+        ? "Sync needs attention"
       : bundle.operations.length
         ? `${bundle.operations.length} pending`
         : bundle.lastSync
@@ -408,13 +402,7 @@ export default function App() {
     .filter((x) => x.p);
   const cartTotal = cartItems.reduce((a, x) => a + x.p.price * x.q, 0);
   const filteredSales = sales
-    .filter(
-      (x) =>
-        filter === "All" ||
-        (filter === "Today"
-          ? day(x.at) === nowDay()
-          : x.at > Date.now() - 7 * 86400000),
-    )
+    .filter((x) => inSalesPeriod(x.at, filter))
     .filter(
       (x) =>
         !search ||
@@ -638,7 +626,7 @@ export default function App() {
             </div>
             <div className="topactions">
               <button
-                className={"connection " + (!online ? "off" : "")}
+                className={"connection " + (!online || syncError ? "off" : "")}
                 onClick={() => go("Sync")}
               >
                 {online ? (
@@ -768,6 +756,7 @@ export default function App() {
                 sync={sync}
                 syncing={syncing}
                 online={online}
+                syncError={syncError}
                 go={go}
                 sales={sales}
                 low={low}
@@ -826,7 +815,7 @@ export default function App() {
                 reviews={reviews}
                 online={online}
                 syncing={syncing}
-                error={error}
+                error={syncError}
                 sync={sync}
                 backup={backup}
                 restoreBackup={restoreBackup}
@@ -1503,30 +1492,13 @@ export default function App() {
                     Edit customer details
                   </button>
                   <div className="reportlist">
-                    {[
-                      ...s.sales
-                        .filter((x) => x.customerId === selected.id)
-                        .map((x) => ({
-                          id: x.id,
-                          at: x.at,
-                          label: "Credit sale",
-                          amount: x.total,
-                        })),
-                      ...s.payments
-                        .filter((x) => x.customerId === selected.id)
-                        .map((x) => ({
-                          id: x.id,
-                          at: x.at,
-                          label: "Payment · " + x.method,
-                          amount: -x.amount,
-                        })),
-                    ]
-                      .sort((a, b) => b.at - a.at)
+                    {creditHistory(s, selected.id)
                       .map((x) => (
                         <div key={x.id}>
                           <span>
                             {x.label}
                             <small>{stamp(x.at)}</small>
+                            {x.detail && <small>{x.detail}</small>}
                           </span>
                           <b className={x.amount < 0 ? "success" : ""}>
                             {x.amount < 0 ? "−" : ""}

@@ -1,0 +1,34 @@
+/* Keep primary actions, icon buttons and compact table controls usable by touch. */
+button.primary,
+button.secondary,
+button.password-toggle,
+.app button.primary,
+.app button.secondary,
+.app button {
+  min-width: 44px;
+  min-height: 44px;
+}
+
+.app .headbuttons button {
+  min-height: 44px;
+}
+
+@media (max-width: 700px) {
+  .app .stat > small,
+  .app .stat > div,
+  .app .pagehead p,
+  .app .breadcrumb,
+  .app .rowtitle small,
+  .app .customercard small,
+  .app .stockwatch small {
+    font-size: 12px;
+  }
+
+  .app .bottomnav button {
+    font-size: 11px;
+  }
+
+  .app .eyebrow {
+    font-size: 10px;
+  }
+}

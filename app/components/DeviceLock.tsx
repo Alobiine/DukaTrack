@@ -1,6 +1,26 @@
-import { useEffect, useState, type ReactNode } from "react";
+import { createContext, useContext, useEffect, useState, type ReactNode } from "react";
 import { readLocal, writeLocal, withWorkspaceLock } from "../../lib/storage";
 type Lock = { salt: string; digest: string; failures: number; until: number };
+const LockControls = createContext<{
+  configured: boolean;
+  busy: boolean;
+  error: string;
+  configure: () => Promise<void>;
+  lock: () => void;
+} | null>(null);
+
+export function DeviceLockControls() {
+  const controls = useContext(LockControls);
+  if (!controls) return null;
+  return (
+    <div>
+      <button className="secondary" disabled={controls.busy} onClick={controls.configured ? controls.lock : controls.configure}>
+        {controls.configured ? "Lock workspace" : "Set device lock"}
+      </button>
+      {controls.error && <p role="alert">{controls.error}</p>}
+    </div>
+  );
+}
 async function digest(pin: string, salt: string) {
   const key = await crypto.subtle.importKey(
     "raw",
@@ -218,18 +238,8 @@ export function DeviceLock({
       </div>
     );
   return (
-    <>
+    <LockControls.Provider value={{ configured, busy, error, configure, lock: () => setUnlocked(false) }}>
       {children}
-      <div style={{ position: "fixed", bottom: 75, right: 16, zIndex: 25 }}>
-        <button
-          className="secondary"
-          disabled={busy}
-          onClick={configured ? () => setUnlocked(false) : configure}
-        >
-          {configured ? "Lock workspace" : "Set device lock"}
-        </button>
-        {error && <p role="alert">{error}</p>}
-      </div>
-    </>
+    </LockControls.Provider>
   );
 }

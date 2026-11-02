@@ -5,7 +5,7 @@ const require = createRequire(import.meta.url),
     "esbuild",
   );
 const r = await build({
-  entryPoints: ["lib/domain.ts", "lib/backup.ts"],
+  entryPoints: ["lib/domain.ts", "lib/backup.ts", "lib/reporting.ts", "lib/export.ts"],
   bundle: true,
   platform: "node",
   format: "esm",
@@ -19,9 +19,35 @@ const mod = async (suffix) =>
         r.outputFiles.find((x) => x.path.endsWith(suffix)).text,
       ).toString("base64")
   );
-const { empty, apply, balance, snapshotSale } = await mod("domain.js"),
-  { parseBackup, mergeBackup } = await mod("backup.js");
+const { empty, apply, applyCloud, balance, snapshotSale } = await mod("domain.js"),
+  { parseBackup, mergeBackup, createBackup, mergeBusinessBackup } = await mod("backup.js");
 let state = empty();
+const { inSalesPeriod, creditHistory } = await mod("reporting.js");
+const { salesCsv } = await mod("export.js");
+{
+  const monday = Date.parse("2026-11-02T10:00:00Z");
+  assert.equal(inSalesPeriod(Date.parse("2026-11-01T21:00:00Z"), "Today", monday), true);
+  assert.equal(inSalesPeriod(Date.parse("2026-11-01T20:59:59Z"), "Today", monday), false);
+  assert.equal(inSalesPeriod(Date.parse("2026-11-01T21:00:00Z"), "This week", monday), true);
+  assert.equal(inSalesPeriod(Date.parse("2026-11-01T20:59:59Z"), "This week", monday), false);
+  const wednesday = Date.parse("2026-11-04T10:00:00Z");
+  assert.equal(inSalesPeriod(monday, "This week", wednesday), true);
+  assert.equal(inSalesPeriod(Date.parse("2026-11-05T10:00:00Z"), "This week", wednesday), false);
+  assert.equal(inSalesPeriod(0, "All", monday), true);
+  console.log("PASS: Kampala midnight and Monday calendar-week filter boundaries.");
+}
+{
+  const rejectedSale = { id: "conflict-reason-test", type: "sale", at: 1, payload: {
+    items: [{ productId: "missing", name: "Original product", quantity: 1, price: 3000 }], method: "Cash", total: 3000,
+  } };
+  const retained = applyCloud(empty(), rejectedSale);
+  const before = structuredClone(retained);
+  assert.throws(() => apply(retained, { id: "blank-resolution", type: "resolve", at: 2, payload: { id: rejectedSale.id, reason: "   " } }), /resolution reason/);
+  assert.deepEqual(retained, before, "An empty review reason must not close or change the conflict");
+  assert.deepEqual(retained.reviews[0].operation, rejectedSale);
+  assert.equal(retained.sales.length, 0);
+  console.log("PASS: owner review requires a reason and preserves the rejected sale evidence.");
+}
 // Customer balances are isolated and repayments cannot exceed the debt.
 {
   let sequence = 0;
@@ -290,6 +316,26 @@ const backup = {
   operations: [],
 };
 const parsed = parseBackup(JSON.stringify(backup), "a");
+const pendingOperation = op("customer", { id: "pending-customer", name: "Pending customer", phone: "" });
+const pendingState = apply(state, pendingOperation);
+const exported = createBackup({ id: "a", business: "Shop" }, {
+  state: pendingState, operations: [pendingOperation], rejected: [], lastSync: 1,
+}, 10);
+const pendingImport = parseBackup(JSON.stringify(exported), "a");
+assert.equal(pendingImport.operations[0].id, pendingOperation.id);
+assert.equal(pendingImport.state.customers.find((customer) => customer.id === "pending-customer").name, "Pending customer");
+exported.state.customers[0].name = "Changed export";
+assert.equal(pendingState.customers[0].name, "Customer", "Export must not share mutable records with the workspace");
+const originalWorkspace = structuredClone(state);
+assert.throws(() => mergeBusinessBackup(state, parsed, "different-current-account"), /another business/);
+assert.deepEqual(state, originalWorkspace);
+assert.equal(mergeBusinessBackup(empty(), parsed, "a").sales.length, 1);
+const legacyWithoutCorrections = structuredClone(state);
+delete legacyWithoutCorrections.corrections;
+mergeBackup(legacyWithoutCorrections, parsed.state);
+assert.equal(Object.hasOwn(legacyWithoutCorrections, "corrections"), false, "Validation must not mutate a legacy workspace");
+assert.throws(() => parseBackup(JSON.stringify({ ...backup, padding: "x".repeat(400000) }), "a"), /400 KB/);
+console.log("PASS: pending-record export, isolated snapshots, final business-identity check, non-mutating validation and import-size limit.");
 assert.equal(mergeBackup(empty(), parsed.state).sales.length, 1);
 assert.equal(mergeBackup(state, parsed.state).sales.length, 1);
 assert.throws(
@@ -316,6 +362,17 @@ const reversed = apply(
   }),
 );
 assert.equal(balance(reversed, "c"), 0);
+const history = creditHistory(reversed, "c");
+assert.equal(history.reduce((sum, row) => sum + row.amount, 0), balance(reversed, "c"));
+assert.equal(history.find((row) => row.label === "Credit sale reversed").amount, -6000);
+assert(history.find((row) => row.label === "Credit sale reversed").detail.includes("Refund UGX 4,000"));
+assert.deepEqual(creditHistory(reversed, "unknown"), []);
+const csv = salesCsv(reversed);
+assert(csv.includes('"10000","10000","0","4000"'));
+const unsafeCsvState = structuredClone(reversed);
+unsafeCsvState.customers[0].name = "=SUM(1)";
+assert(salesCsv(unsafeCsvState).includes("\"'=SUM(1)\""));
+console.log("PASS: customer correction/refund history reconciles to balance and CSV exports retain net/refund values with formula escaping.");
 assert.equal(reversed.products[0].quantity, 10);
 assert.equal(state.products[0].quantity, 8);
 assert.equal(

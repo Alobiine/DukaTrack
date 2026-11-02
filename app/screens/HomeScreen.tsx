@@ -28,6 +28,7 @@ type Props = {
   sync: () => Promise<void>;
   syncing: boolean;
   online: boolean;
+  syncError: string;
   go: (name: string) => void;
   sales: Sale[];
   low: Product[];
@@ -45,6 +46,7 @@ export function HomeScreen({
   sync,
   syncing,
   online,
+  syncError,
   go,
   sales,
   low,
@@ -169,7 +171,7 @@ export function HomeScreen({
             <Cloud size={21} />
             <div>
               <b>
-                {bundle.operations.length
+                {syncError ? "Sync needs attention" : bundle.operations.length
                   ? `${bundle.operations.length} records ready to sync`
                   : "Your records, in step"}{" "}
               </b>

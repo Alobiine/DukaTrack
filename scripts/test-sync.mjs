@@ -117,3 +117,39 @@ assert.equal(checkpoints[1].rejected[0].operation.id, "offline-sale");
 console.log(
   "PASS: optimistic replay conflicts retain unsent operations and complete rejection evidence.",
 );
+
+// A device with no pending writes must still download the current cloud state.
+const downloaded = blank();
+downloaded.state.customers.push({ id: "cloud-customer", name: "Cloud customer", phone: "" });
+let downloadSaves = 0;
+const refreshed = await synchronise(blank(), async (ops) => {
+  assert.deepEqual(ops, []);
+  return { state: downloaded.state, accepted: [], rejected: [], syncedAt: 42 };
+}, async (next) => {
+  downloadSaves++;
+  assert.equal(next.lastSync, 42);
+  assert.equal(next.state.customers[0].id, "cloud-customer");
+});
+assert.equal(downloadSaves, 1);
+assert.equal(refreshed.operations.length, 0);
+
+// Count encoded UTF-8 bytes, not characters, when limiting network batches.
+const large = blank();
+large.operations = Array.from({ length: 4 }, (_, i) => ({
+  id: "large-" + i, type: "customer", at: 1,
+  payload: { id: "large-" + i, name: "Customer", phone: "", evidence: "界".repeat(50000) },
+}));
+const byteBatches = [];
+const drained = await synchronise(large, async (ops) => {
+  byteBatches.push(ops.length);
+  assert(new TextEncoder().encode(JSON.stringify(ops)).length < 450000);
+  return { state: blank().state, accepted: ops.map((op) => op.id), rejected: [], syncedAt: 43 };
+}, async () => {});
+assert.deepEqual(byteBatches, [2, 2]);
+assert.equal(drained.operations.length, 0);
+
+const tooLarge = blank();
+tooLarge.operations = [{ id: "oversized", type: "customer", at: 1, payload: { evidence: "x".repeat(450001) } }];
+await assert.rejects(synchronise(tooLarge, async () => assert.fail("Oversized records must not be sent"), async () => assert.fail("Oversized records must remain pending")), /450 KB/);
+assert.equal(tooLarge.operations.length, 1);
+console.log("PASS: empty-queue cloud downloads, UTF-8 batch byte limits and oversized pending-record preservation.");

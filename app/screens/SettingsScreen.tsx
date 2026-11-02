@@ -1,4 +1,5 @@
 import { Download, Store, LogOut } from "lucide-react";
+import { DeviceLockControls } from "../components/DeviceLock";
 
 type Props = {
   account: { business: string; owner: string; phone: string | null; email?: string | null };
@@ -78,14 +79,13 @@ export function SettingsScreen({
           <button className="secondary" onClick={() => open("password")}>
             Change password
           </button>
+          <DeviceLockControls />
           <button className="secondary dangertext" onClick={logout}>
             <LogOut size={17} />
             Sign out
           </button>
           <small>
-            App release 0.1 · Backup restoration is available. Account recovery
-            requires email delivery setup. Multi-user roles and full security
-            testing are still pending.
+            DukaTrack · Version 0.1
           </small>
         </div>
       </section>

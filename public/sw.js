@@ -1,5 +1,5 @@
 const CACHE = "dukatrack-v2";
-const SHELL = ["/", "/icon.svg", "/manifest.webmanifest"];
+const SHELL = ["/", "/icon.svg", "/manifest.webmanifest", "/icons/icon-192.png", "/icons/icon-512.png", "/icons/apple-touch-icon.png"];
 self.addEventListener("install", (event) => {
   event.waitUntil(caches.open(CACHE).then((c) => c.addAll(SHELL)));
 });

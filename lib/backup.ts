@@ -1,4 +1,5 @@
 import type { State, Operation } from "./domain";
+import type { Bundle } from "./sync";
 const fail = (message: string): never => {
   throw Error(message);
 };
@@ -14,7 +15,7 @@ const integer = (x: unknown) =>
   Number(x) <= Number.MAX_SAFE_INTEGER;
 const timestamp = (x: unknown) => integer(x) && Number(x) <= 8640000000000000;
 export function validateState(value: unknown): State {
-  const s = record(value);
+  const s = structuredClone(record(value));
   if (s.corrections === undefined) s.corrections = [];
   if (!Array.isArray(s.corrections)) fail("Invalid correction history.");
   for (const key of [
@@ -279,6 +280,20 @@ export type Backup = {
   operations: Operation[];
   exportedAt: number;
 };
+export function createBackup(business: Backup["business"], bundle: Bundle, exportedAt = Date.now()) {
+  return {
+    format: "dukatrack-v1" as const,
+    schemaVersion: 1 as const,
+    business: structuredClone(business),
+    exportedAt,
+    ...structuredClone(bundle),
+  };
+}
+export function mergeBusinessBackup(current: State, source: Backup, accountId: string): State {
+  if (source.business.id !== accountId)
+    fail("This backup belongs to another business. Sign in to the original business.");
+  return mergeBackup(current, source.state);
+}
 export function parseBackup(text: string, accountId: string): Backup {
   if (new TextEncoder().encode(text).length > 400000)
     fail("Backup exceeds the supported 400 KB import limit.");

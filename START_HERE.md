@@ -56,6 +56,14 @@ npm.cmd run test:runtime
 
 ## Offline and browser checks
 
+Automated desktop Chrome acceptance is available after a production build:
+
+```powershell
+npm.cmd run test:browser
+```
+
+This launches a headless Chromium browser with a new profile and a separate local D1 database under `.sites-runtime/browser-offline`. It covers offline creation/reopen/reconnect; receipts and backup file downloads/imports/safety copies; dashboard/stock/history/report/CSV values; sync errors; password changes/device lock; PWA installability; mobile viewport/touch targets; and modal keyboard focus. It does not touch your normal browser profile or production records. Chrome or Edge must be installed; set `DUKATRACK_BROWSER_EXECUTABLE` to override its path. Actual Android/iPhone installation and cross-device checks remain separate. Device-lock controls are in Settings.
+
 ```powershell
 npm.cmd run build
 npm.cmd start

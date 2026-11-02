@@ -51,10 +51,12 @@ export function SyncScreen({
           <h2>
             {syncing
               ? "Synchronising records..."
+              : error
+                ? "Sync needs attention"
               : !bundle.lastSync && !bundle.operations.length
                 ? "First sync pending"
                 : bundle.operations.length
-                  ? `${bundle.operations.length} records waiting`
+                  ? `${bundle.operations.length} ${bundle.operations.length === 1 ? "record" : "records"} waiting`
                   : "Your workspace is up to date"}
           </h2>
           <p>

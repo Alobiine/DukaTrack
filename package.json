@@ -18,7 +18,8 @@
     "deploy:cloudflare": "node scripts/deploy-cloudflare.mjs",
     "typecheck": "tsc --noEmit",
     "test": "node scripts/test-business.mjs && node scripts/test-sync.mjs && node scripts/test-backup.mjs && node scripts/test-offline.mjs",
-    "test:runtime": "node scripts/test-runtime.mjs"
+    "test:runtime": "node --import ./scripts/sites-env.mjs scripts/test-runtime.mjs",
+    "test:browser": "node --import ./scripts/sites-env.mjs scripts/test-browser-offline.mjs"
   },
   "dependencies": {
     "@base-ui/react": "^1.7.0",
