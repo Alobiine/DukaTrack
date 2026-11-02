@@ -85,7 +85,7 @@ For later deployments, set the same database variables and run validation and de
 
 The deployed URL accepts visitors; business records require the app's account login. Synced records live in D1 in your Cloudflare account; offline changes remain in the device browser until accepted by sync. Cloudflare billing and account limits apply.
 
-Password recovery supports direct Brevo delivery on the main Worker. Configure the `BREVO_API_KEY` secret, `BREVO_SENDER_EMAIL` and `DUKATRACK_APP_URL`; see [EMAIL_SETUP.md](EMAIL_SETUP.md). Live inbox delivery needs manual verification. A separate email adapter is optional. Connected ChatGPT app tools require Sites infrastructure and are not supplied by direct Cloudflare hosting.
+Password recovery supports direct Brevo delivery on the main Worker. Configure the `BREVO_API_KEY` secret, `BREVO_SENDER_EMAIL` and `DUKATRACK_APP_URL`; see [EMAIL_SETUP.md](EMAIL_SETUP.md). Live inbox delivery needs manual verification. A separate email adapter is optional. Connected app tools require Sites infrastructure and are not supplied by direct Cloudflare hosting.
 
 To add a domain later, open Cloudflare **Workers & Pages → dukatrack → Settings → Domains & Routes → Add → Custom Domain**.
 
