@@ -14,7 +14,6 @@ import { CreditScreen } from "./screens/CreditScreen";
 import { StockScreen } from "./screens/StockScreen";
 import { Brand, Field } from "./components/primitives";
 import { PasswordField } from "./components/PasswordField";
-("use client");
 import { useWorkspaceUpdates } from "./components/useWorkspaceUpdates";
 import { CorrectionForm } from "./components/CorrectionForm";
 
