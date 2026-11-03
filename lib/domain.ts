@@ -1,7 +1,9 @@
 import { mergeBackup } from "./backup";
+import { isStockUnit } from "./units";
 export type Product = {
   id: string;
   name: string;
+  unit?: string;
   price: number;
   quantity: number;
   threshold: number;
@@ -186,6 +188,8 @@ export function apply(input: State, op: Operation): State {
       break;
     }
     case "product": {
+      if (p.unit !== undefined && !isStockUnit(p.unit))
+        throw Error("Select a valid stock unit.");
       if (
         !label(p.name) ||
         !positive(p.price, true) ||
@@ -204,6 +208,7 @@ export function apply(input: State, op: Operation): State {
           );
         Object.assign(old, {
           name: p.name.trim(),
+          unit: p.unit?.trim() ?? old.unit ?? "Pieces",
           price: p.price,
           threshold: p.threshold,
           updatedAt: op.at,
@@ -215,6 +220,7 @@ export function apply(input: State, op: Operation): State {
         s.products.push({
           id: p.id,
           name: p.name.trim(),
+          unit: p.unit?.trim() ?? "Pieces",
           price: p.price,
           threshold: p.threshold,
           quantity: p.quantity,

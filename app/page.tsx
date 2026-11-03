@@ -1,6 +1,7 @@
 "use client";
 
 import { snapshotSale } from "../lib/domain";
+import { StockUnitField } from "./components/StockUnitField";
 import { salesCsv } from "../lib/export";
 import { creditHistory, inSalesPeriod } from "../lib/reporting";
 import { SalesScreen } from "./screens/SalesScreen";
@@ -987,6 +988,7 @@ export default function App() {
                     mutate("product", {
                       id: selected?.id || uid(),
                       name: f.name,
+                      unit: f.unit === "other" ? f.customUnit.trim() : f.unit,
                       price: +f.price,
                       quantity: selected?.quantity ?? +f.quantity,
                       threshold: +f.threshold,
@@ -1004,6 +1006,7 @@ export default function App() {
                     maxLength={120}
                   />
                   <div className="formgrid">
+                    <StockUnitField key={selected?.id ?? "new"} unit={selected?.unit} />
                     <Field
                       label="Selling price (UGX)"
                       name="price"

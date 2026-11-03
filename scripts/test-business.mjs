@@ -135,6 +135,7 @@ let operations = [
   op("p", "product", {
     id: "sugar",
     name: "Sugar",
+    unit: "Kilograms (kg)",
     price: 5000,
     quantity: 10,
     threshold: 3,
@@ -152,6 +153,7 @@ assert.equal(r.status, 200);
 let d = await r.json();
 assert.equal(d.accepted.length, 4);
 assert.equal(d.state.products[0].quantity, 8);
+assert.equal(d.state.products[0].unit, "Kilograms (kg)");
 assert.equal(d.state.sales.length, 1);
 assert.equal(d.state.payments[0].amount, 4000);
 const customerEdit = op("edit-customer", "customer-edit", {

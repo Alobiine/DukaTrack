@@ -1,4 +1,5 @@
 import type { State, Operation } from "./domain";
+import { isStockUnit } from "./units";
 import type { Bundle } from "./sync";
 const fail = (message: string): never => {
   throw Error(message);
@@ -52,6 +53,7 @@ export function validateState(value: unknown): State {
       typeof p.name !== "string" ||
       !p.name.trim() ||
       p.name.length > 120 ||
+      (p.unit !== undefined && !isStockUnit(p.unit)) ||
       ![p.price, p.quantity, p.threshold].every(integer) ||
       !timestamp(p.updatedAt) ||
       p.quantity > 1e9 ||

@@ -43,6 +43,7 @@ export function StockScreen({ products, low, search, setSearch, open }: Props) {
               <thead>
                 <tr>
                   <th>Product</th>
+                  <th>Unit</th>
                   <th>Selling price</th>
                   <th>In stock</th>
                   <th>Status</th>
@@ -64,6 +65,7 @@ export function StockScreen({ products, low, search, setSearch, open }: Props) {
                           <b>{p.name}</b>
                         </span>
                       </td>
+                      <td>{p.unit ?? "Pieces"}</td>
                       <td>{money(p.price)}</td>
                       <td className="bold">
                         {p.quantity}
